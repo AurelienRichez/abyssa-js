@@ -711,6 +711,38 @@ test('redirect', function() {
   var newRouteEntered
 
   var router = Router({
+    baseRoute: State('baseRoute'),
+    oldRoute: State('oldRoute', {
+      enter: function() {
+        router.transitionTo('newRoute')
+      },
+      exit: function() { oldRouteExited = true }
+    }, {
+      oldRouteChild: State('child', { enter: function() { oldRouteChildEntered = true } })
+    }),
+
+    newRoute: State('newRoute', { enter: function() { newRouteEntered = true } })
+  })
+
+  pushedStates.length = 0
+  replacedState.length = 0
+
+  router.init('baseRoute').transitionTo('oldRoute.oldRouteChild')
+
+  equal(pushedStates.length, 1, 'A redirection should push a single history entry')
+  equal(replacedState.length, 0, 'A redirection should not replace the history state')
+  
+  ok(!oldRouteExited, 'The state was not properly entered as it redirected immediately. Therefore, it should not exit.')
+  ok(!oldRouteChildEntered, 'A child state of a redirected route should not be entered')
+  ok(newRouteEntered)
+})
+
+test('redirect on init', function() {
+  var oldRouteChildEntered
+  var oldRouteExited
+  var newRouteEntered
+
+  var router = Router({
 
     oldRoute: State('oldRoute', {
       enter: function() {
@@ -726,16 +758,17 @@ test('redirect', function() {
   })
 
   pushedStates.length = 0
+  replacedState.length = 0
 
   router.init('oldRoute.oldRouteChild')
 
-  equal(pushedStates.length, 1, 'A redirection should push a single history entry')
+  equal(pushedStates.length, 0, 'A redirection on init should not push an history entry')
+  ok(replacedState.length > 0, 'A redirection on init should replace the history state')
 
   ok(!oldRouteExited, 'The state was not properly entered as it redirected immediately. Therefore, it should not exit.')
   ok(!oldRouteChildEntered, 'A child state of a redirected route should not be entered')
   ok(newRouteEntered)
 })
-
 
 test('Redirecting from transition.started', function() {
 
@@ -1212,9 +1245,18 @@ test('The public fullName of a _default_ state is the same as its parent', funct
 
 
 const pushedStates = []
+const replacedState = []
 function stubHistory() {
   window.history.pushState = function(state, title, url) {
     pushedStates.push({
+      state: state,
+      title: title,
+      url: url
+    })
+  }
+
+  window.history.replaceState = function(state, title, url) {
+    replacedState.push({
       state: state,
       title: title,
       url: url
